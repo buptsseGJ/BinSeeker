@@ -76,7 +76,6 @@ def getArgValue(arg):
     elif isinstance(arg, pyvex.expr.RdTmp):
         return temporarySpace[int(arg.tmp)]
     else:
-        print "error in getArgValue"
         raise BaseException
         return 0
 
@@ -102,7 +101,6 @@ def processTriOp(op,args):
         else:
             return intOrFloatToFloat(arg1, 0)
     else:
-        print "other in processTriop"
         raise BaseException
     return result
     
@@ -115,7 +113,6 @@ def processQop(op,args):
     if "x86g_use_seg_selector" in op[4:]:
         return result
     else:
-        print "other in processQop"
         raise BaseException
 
 def processCCall(type,op,args):
@@ -974,7 +971,6 @@ def processBinOp(op,args):
         else:
             return interleaveLO32_4(arg1,arg2)#左边是源操作数，右边是目的操作数
     else:
-        print "other binary operations"
         raise BaseException("other binary operations",op[4:])
     return result
 
@@ -1184,7 +1180,6 @@ def f64toI64S(encoding,value):
             else:
                 return c_longlong(int(math.ceil(value))).value
     else:
-        print "其他的近似方式"
         raise BaseException
 
 def f64toI32S(encoding,value):
@@ -1243,7 +1238,6 @@ def f64toI32S(encoding,value):
             else:
                 return c_int32(int(math.ceil(value))).value
     else:
-        print "其他的近似方式"
         raise BaseException
 
 def intOrFloatToFloat(encoding,value):
@@ -1302,7 +1296,6 @@ def intOrFloatToFloat(encoding,value):
             else:
                 return float(math.ceil(value))
     else:
-        print "其他的近似方式"
         raise BaseException
 
 def isClose(a, b, rel_tol=1e-09, abs_tol=0.0):
@@ -1522,7 +1515,6 @@ def processUnopExpr(op,args):
     elif "ReinterpI64asF64" in op[4:]:
         return float(result)
     else:
-        print "other processUnopExpr"
         raise BaseException("other unopExpr",op[4:])
 
 def fold_Clz32(value):
@@ -1645,7 +1637,6 @@ def processITEExpr(cond,iftrue,iffalse):
 
 def getLow8BitValue(value):
     if isinstance(value,basestring):#如果是字符串,Python的字符串的基类是basestring，包括了str和unicode类型
-        print "ord",ord(value[0])
         return ord(value[0])
     else:
         return value&255
@@ -1699,13 +1690,10 @@ def writeIOWhenRegisterArg(offset):
         
 def processWrTmp(stmt):
     for expr in stmt.expressions:
-        #print "type ",type(expr)
         if isinstance(expr, pyvex.IRExpr.Get):
             offset = expr.offset
             ty = expr.type
             writeIOWhenRegisterArg(offset)
-            print expr.offset,ty#28,Ity_I32
-            print stmt.data,stmt.tmp#0
             #栈帧的开始与结束设置
             number = int(expr.offset)
             if number not in registerOffset.x86Offset.keys():
@@ -1800,7 +1788,6 @@ def processWrTmp(stmt):
                     temporarySpace[int(stmt.tmp)] = 0
                     return 
         elif isinstance(expr,pyvex.IRExpr.GetI):
-            #print expr.descr, expr.ix, expr.bias
             status = processGetIExpr(expr.descr,expr.ix,expr.bias)
             temporarySpace[int(stmt.tmp)] = status
             return
@@ -1856,7 +1843,6 @@ def processWrTmp(stmt):
             temporarySpace[int(stmt.tmp)] = result
             return
         elif isinstance(expr, pyvex.IRExpr.CCall):
-            #print expr.retty,expr.cee,expr.args
             result = processCCall(expr.retty,expr.cee,expr.args)
             temporarySpace[int(stmt.tmp)] = result
             return
@@ -1877,7 +1863,6 @@ def processPut(stmt):
             else:
                 globalSpace[offset] = value#offset有可能是xmm0的高64位，暂时还没有分配给具体的xmmi
         elif isinstance(expr,pyvex.expr.Const):
-            #print "expr.con",expr.con
             if offset in registerOffset.x86Offset.keys():
                 globalSpace[registerOffset.x86Offset[int(stmt.offset)]] = int(str(expr.con),16)#存储进去的是str，不知道是否要变成整数，暂时还没用到
             else:
@@ -2052,7 +2037,6 @@ def emulateIR(irStmts):
     for item in irStmts:
         if isinstance(item,pyvex.IRStmt.IMark):
             currentInstr = item.addr
-            print "currentInstr",currentInstr
             if item.addr in switchJump.keys():
                 switchFlag = True
             continue
@@ -2075,8 +2059,6 @@ def emulateIR(irStmts):
         elif isinstance(item,pyvex.IRStmt.MBE):
             raise BaseException("MBE operation")
         elif isinstance(item,pyvex.IRStmt.Dirty):
-            print "tmp","guard","cee","args",'mFx', 'mAddr', 'mSize', 'nFxState'
-            print item.tmp,item.guard,item.cee,','.join(str(arg) for arg in item.args),item.mFx,item.mAddr,item.mSize,item.nFxState
             processDirty(item.tmp,item.cee,item.args,item.mAddr)
             #raise BaseException("Dirty operation")
         elif isinstance(item,pyvex.IRStmt.Exit):
@@ -2299,10 +2281,8 @@ def processLibFunc(funcName):
 def reachMaxCountOfBlock(addr):
     global maxLoopOrRecursion
     if blockLoopOrRecursion[addr] < maxLoopOrRecursion:
-        print "块循环次数",addr, blockLoopOrRecursion[addr]
         return False
     else:
-        print "块循环次数",addr, blockLoopOrRecursion[addr]
         return True
 
 def incCountOfBlock(addr):
@@ -2318,14 +2298,11 @@ def reachMaxCountOfFunction(addr):
     else:
         funcLoopOrRecursion[addr] = funcLoopOrRecursion[addr] + 1
     if funcLoopOrRecursion[addr] <= maxLoopOrRecursion:
-        print "函数递归次数",addr, funcLoopOrRecursion[addr],False
         return False
     else:
-        print "函数递归次数",addr, funcLoopOrRecursion[addr],True
         return True
 
 def isUserFunc(addr):
-    print "hanshu:", addr
     if addr in allUserFuncs:
         return True
     else:
@@ -2388,7 +2365,6 @@ def emulateFunction(db,startAddr):
         #incCountOfBlock(blockAddr)
         findCondition = {}
         findCondition["start"] = blockAddr
-        print "blockAddr",blockAddr
         block = database.findOneBlock(db,findCondition)
         if block == None:
             libCondition = {}
@@ -2446,8 +2422,6 @@ def emulateFunction(db,startAddr):
                     cfgInfo = database.findOneCfg(db,condition)
                     if cfgInfo["num"] != 0:
                         blockAddr = endAddr
-                        print "blockAddr:",blockAddr
-                        print "startAddr:",startAddr
                         if blockAddr >= functionInfo[startAddr]:#为了防止函数最后一条语句为call 未知的函数时，避免发生仿真越界的现象。example:wget-gcc-O0 abort_run_with_timeout 在call _siglongjmp后越界
                             return#clang-O1中会出现startAddr并非真正函数开始地址的情况，还没定位出问题是什么，情况比较少见
                     else:
@@ -2532,7 +2506,6 @@ def initialPushAndCall(db):
     tempLists = database.findAllPushAndCall(db)
     for item in tempLists:
         pushAndCallList = item["addrs"]
-    print "PushAndCall",pushAndCallList  
 
 def loadSwitchJump(db):
     switchJump
@@ -2641,7 +2614,6 @@ def emulateSpecifiedFunction(directory,proName,fiName,funcName,calledFrom = 1):#
 
     if calledFrom == 2:
         isVulnerabilityProgram = True
-    print isVulnerabilityProgram,programName,fileName
     db,client = database.connectDB(isVulnerabilityProgram,False,programName,fileName)
     functions = database.findAllFunctions(db)
     initialUserFuncs(db)
@@ -2686,7 +2658,6 @@ def emulateSpecifiedFunction(directory,proName,fiName,funcName,calledFrom = 1):#
         loadConsttoMemory(consts)
         fileWritePosition = generateFilePath(directory, programName + "+" + fileName + "+" + item["name"])
         fwrite = open(fileWritePosition, 'w')
-        print "仿真函数", hex(item["start"]),item["start"],item["name"]
         emulateFunctions.add(startAddr)
         emulateFunction(db, startAddr)
         while signatureLength < 20:
@@ -2694,22 +2665,14 @@ def emulateSpecifiedFunction(directory,proName,fiName,funcName,calledFrom = 1):#
             emulateFunctionAgain(db,startAddr,item)
     except BaseException,e:
         if startAddr in emulateFunctions:
-            print "仿真失败"
             fwrite1.write(item["name"]+"    " + "fail" + str(startAddr) + "\n")
             fwrite1.flush()
-            print 'str(Exception):\t', str(Exception)
             print 'str(e):\t\t', str(e)
-            print 'repr(e):\t', repr(e)
-            print 'e.message:\t', e.message
-            print 'traceback.print_exc():'; traceback.print_exc()
-            print 'traceback.format_exc():\n%s' % traceback.format_exc()
             fwrite.flush()
             fwrite.close()
     else:
         if startAddr in emulateFunctions:
             global currentState
-            print "仿真成功"
-            print item["name"], "    ", "success ", currentState
             fwrite1.write(item["name"]+"    " + "success " + currentState + "\n")
             fwrite1.flush()
             fwrite.flush()
@@ -2719,7 +2682,6 @@ def emulateSpecifiedFunction(directory,proName,fiName,funcName,calledFrom = 1):#
     endtime = datetime.datetime.now()
     fwrite1.write("end time:" + str(endtime) + "\n")
     timeDiff = (endtime - starttime).seconds
-    print type(timeDiff),timeDiff
     fwrite1.write("time diff:" + str(timeDiff) + "\n")
     fwrite1.close()
     database.closeConnect(client)
@@ -2813,7 +2775,6 @@ if __name__ == '__main__':
                     if startAddr == emulateAddr:
                         fileWritePosition = generateFilePath(directory,item["name"])
                         fwrite = open(fileWritePosition, 'w')
-                        print "仿真函数", hex(item["start"]),item["start"],item["name"]
                         emulateFunctions.add(startAddr)
                         emulateFunction(db,startAddr)
                         while signatureLength < 20:
@@ -2822,31 +2783,21 @@ if __name__ == '__main__':
                 else:
                     fileWritePosition = generateFilePath(directory,item["name"])
                     fwrite = open(fileWritePosition, 'w')
-                    print "仿真函数", hex(item["start"]),item["start"],item["name"]
                     emulateFunctions.add(startAddr)
                     emulateFunction(db, startAddr)
                     while signatureLength < 20:
                         argsDistributionIndex = argsDistributionIndex + 1
                         emulateFunctionAgain(db,startAddr,item)
             except BaseException,e:
-                print "仿真失败"
                 if startAddr in emulateFunctions:
-                    print "仿真失败"
                     fwrite1.write(item["name"]+"    " + "fail" + str(startAddr) + "\n")
                     fwrite1.flush()
-                    print 'str(Exception):\t', str(Exception)
                     print 'str(e):\t\t', str(e)
-                    print 'repr(e):\t', repr(e)
-                    print 'e.message:\t', e.message
-                    print 'traceback.print_exc():'; traceback.print_exc()
-                    print 'traceback.format_exc():\n%s' % traceback.format_exc()
                     fwrite.flush()
                     fwrite.close()
             else:
                 if startAddr in emulateFunctions:
                     global currentState
-                    print "仿真成功"
-                    print item["name"], "    ", "success ", currentState
                     fwrite1.write(item["name"]+"    " + "success " + currentState + "\n")
                     fwrite1.flush()
                     fwrite.flush()
@@ -2856,7 +2807,6 @@ if __name__ == '__main__':
         endtime = datetime.datetime.now()
         fwrite1.write("end time:" + str(endtime) + "\n")
         timeDiff = (endtime - starttime).seconds
-        print type(timeDiff),timeDiff
         fwrite1.write("time diff:" + str(timeDiff) + "\n")
         fwrite1.close()
         database.closeConnect(client)

@@ -81,23 +81,7 @@ class Process_with_Single_Function(object):
 
 
 class Switch(object): 
-     """IDA Switch 
-  
-     Access IDA switch data with ease. 
-  
-     Usage: 
-  
-         >>> my_switch = Switch(switch_jump_address) 
-         >>> for case, target in my_switch: 
-         ...     print "{} -> 0x{:08X}".format(case, target) 
-  
-     """ 
      def __init__(self, ea): 
-         """Initialize a switch parser. 
-  
-         Args: 
-             ea: An address of a switch jump instruction. 
-         """ 
          self._ea = ea 
   
          results = self._calc_cases() 
@@ -177,15 +161,8 @@ def identify_switch(startAddr,endAddr):
         if idc.isCode(idc.GetFlags(head_ea)):
             switch_info=idaapi.get_switch_info_ex(head_ea)
             if(switch_info and switch_info.jumps!=0):
-                print "function addr and name",hex(head_ea),idc.GetFunctionName(head_ea)
-                print "element base",switch_info.elbase
-                print "start of switch idiom", switch_info.startea
-                print "jump table address", switch_info.jumps
-                print "element_num",switch_info.get_jtable_size()
-                print "element_size",switch_info.get_jtable_element_size()
                 my_switch=Switch(head_ea)
                 #for case,target in my_switch:
-                print ('%s,%s\n'%(my_switch.cases, my_switch.targets))
                 casesList.append(my_switch.cases)
                 targetsList.append(my_switch.targets)
                 head_ea_List.append(head_ea)
@@ -262,7 +239,6 @@ def getAllBlocksInFunction(func_t):
     allBlocks = {}     
     startAddr = func_t.startEA
     endAddr = func_t.endEA
-    print "function start and end",hex(startAddr),hex(endAddr)
     for i in range(flowchart.size):
         basicBlock = flowchart.__getitem__(i)
         if basicBlock.startEA >= startAddr and basicBlock.startEA < endAddr:
@@ -270,7 +246,6 @@ def getAllBlocksInFunction(func_t):
     return allBlocks#Objects
 
 def getNewCFGIncludeCall(cfg, allBlocks, func_t):
-    print "cfg",cfg
     global repAddr
     repAddr = []
     startEnd = {}#record the start and end of a basic block
@@ -335,7 +310,6 @@ def depth_first_search(cfg,root=None):
     for node in cfg.keys():
         if not node in visited:
             dfs(node)
-    print order
     return order
 
 def isContainDot(value):
@@ -712,10 +686,8 @@ def identifyStackArgs(func_t):
                     pass#if the visit is a global variable, then we may need a special solution 
                 if type == 7 or type == 6:#call or jmp, include near or far address
                     if GetMnem(addr)=="call":
-                        print "call continue before"
                         pushAndCallList.add(addr)
                         continue
-                        print "call continue after"
                         functionName = GetOpnd(addr,i)
                         if function.functionMap.has_key(functionName):
                             if functionName not in functionSet:
@@ -768,7 +740,6 @@ def identifyArgs(func_t):
             length = 0
             while length < len(path):
                 addr = path[length]  
-                print hex(addr),get_instruction(addr)
                 type1 = GetOpType(addr,0)
                 type2 = GetOpType(addr,1)
                 for i in range(2):
@@ -804,83 +775,63 @@ def identifyArgs(func_t):
                         register = GetOpnd(addr,i)
                         register = getNewArgsRegister(register)
                         instr = GetMnem(addr)
-                        print "instr ",instr
                         if register in argRegisters:
                             if type2 == 0:#说明没有第二个操作数
                                 if instr != "push" and instr!= "pop":
                                     if register not in modifiedReg:
                                         registerArgs.add(register)
                                         modifiedReg.add(register)
-                                        print "加入被修改的寄存器参数集合", register
                                 if instr == "pop":
                                     if register in modifiedReg:
                                         modifiedReg.remove(register)
-                                        print "在被修改的寄存器集合中弹出",register
                                 elif instr == "push":
                                     print "push不需要特殊处理"
                             elif type2 !=0:#两个操作数
                                 if instr == "xor":
                                     if isSameRegister(get_instruction(addr)):
                                         modifiedReg.add(register)#因为 test 和  cmp 不改变寄存器的值
-                                        print "加入被修改的寄存器参数集合,由于xor的存在", register
                                     else:
                                         if i == 1 and register not in modifiedReg:
                                             registerArgs.add(register)
-                                            print "加入寄存器参数集合,由于xor", register
                                         elif i == 0:
                                             if register not in modifiedReg:
                                                 registerArgs.add(register)
-                                                print "加入寄存器参数集合,由于xor", register
-                                                modifiedReg.add(register)
-                                                print "加入被修改的寄存器参数集合,由于xor的存在", register
-                                    
+                                                modifiedReg.add(register)                                    
                                 else:
-                                    print "被修改的寄存器参数",modifiedReg
-                                    print "register ",register
                                     if (register not in modifiedReg):#i=0或等于1时都会判断是否会加入到寄存器参数中,但是mov指令除外                                    
                                         if not (i==0 and (instr in doubleOperandsInstrs)):
                                             registerArgs.add(register)
-                                            print "加入寄存器参数集合", register
                                     if i == 0:#只有第一个操作数才能被改动，所有i=1时的第二个操作数不用处理,但是交换指令要除外
                                         if instr != "cmp" and instr != "test":
                                             modifiedReg.add(register)#因为 test 和  cmp 不改变寄存器的值
-                                            print "加入被修改的寄存器参数集合", register
                                     if i == 1 and instr == "xchg":
                                         modifiedReg.add(register)#因为 test 和  cmp 不改变寄存器的值
-                                        print "加入被修改的寄存器参数集合,由于xchg的存在", register
                             else:#没有操作数
                                 continue
                         else:
                             continue 
                     elif type == 2:#Memory Reference                       
                         valueAddr = GetOperandValue(addr,i) 
-                        print "disasm",idc.GetDisasm(valueAddr)
                         disam = idc.GetDisasm(valueAddr)
                         size = ItemSize(valueAddr)
                         value = 0
                         if size == 8:
                             value = GetDouble(valueAddr)
-                            print "original GetDouble",value
                             if math.isnan(value):
                                 value = 0
-                            print "GetDouble",value
                         if size ==4:
                             if (valueAddr < segment.rodataSegment[1]) and (valueAddr >= segment.rodataSegment[0]):
                                 infer = isContainDot(disam)
                                 if infer == True:
                                     value = round(GetFloat(valueAddr),6)                       
-                                    print "GetFloat",value
                                 else:
                                     value = int(Dword(valueAddr))
-                                    print "GetInt",value
                             elif (valueAddr < segment.dataSegment[1]) and (valueAddr >= segment.dataSegment[0]):
                                 infer = isContainDot(disam)
                                 if infer == True:
                                     value = round(GetFloat(valueAddr),6)                       
-                                    print "GetFloat",value
                                 else:
                                     value = int(Dword(valueAddr))
-                                    print "GetInt",value                            
                         segment.constUsage[valueAddr] = value
                     elif type ==5: #offset
                         instructions = get_instruction(addr)   
@@ -888,27 +839,19 @@ def identifyArgs(func_t):
                         disam = idc.GetDisasm(valueAddr)
                         if isString(disam):#isString(instructions)原先还有一个or条件
                             isContainSC = containSemicolonAndComma(disam)
-                            print "isContainSC",isContainSC
                             if isContainSC:
                                 value = getString1(disam)
                             else:                                              
                                 value = GetString(valueAddr)
-                            print "value",value
                             if value is None:
-                                print "enter value is None"
                                 value = getString1(disam)
-                            print "source string",value
-                            print "encoding before",chardet.detect(value)
                             if value is None:
                                 value = " "
                             if (valueAddr < segment.rodataSegment[1]) and (valueAddr >= segment.rodataSegment[0]):
                                 value = changeEncoding(value)
                             elif (valueAddr < segment.dataSegment[1]) and (valueAddr >= segment.dataSegment[0]):
                                 value = changeEncoding(value)
-                            print "value",value
                             segment.constUsage[valueAddr] = value
-                            print "encoding after", chardet.detect(value)
-                            print "encoding after string",value
                         else:
                             disam = idc.GetDisasm(valueAddr)
                             value = 0
@@ -916,25 +859,20 @@ def identifyArgs(func_t):
                             if size == 8:
                                 value = GetDouble(valueAddr)
                                 
-                                print "GetDouble",value
                             if size ==4:
                                 if (valueAddr < segment.rodataSegment[1]) and (valueAddr >= segment.rodataSegment[0]):
                                     infer = isContainDot(disam)
                                     if infer == True:
                                         value = round(GetFloat(valueAddr),6)                       
-                                        print "GetFloat",value
                                     else:
                                         value = int(Dword(valueAddr))
-                                        print "GetInt",value
                                     segment.constUsage[valueAddr] = value
                                 elif (valueAddr < segment.dataSegment[1]) and (valueAddr >= segment.dataSegment[0]):
                                     infer = isContainDot(disam)
                                     if infer == True:
                                         value = round(GetFloat(valueAddr),6)                       
-                                        print "GetFloat",value
                                     else:
                                         value = int(Dword(valueAddr))
-                                        print "GetInt",value                
                                     segment.constUsage[valueAddr] = value
                     elif type ==11:
                         print GetOperandValue(addr,i)      
@@ -943,21 +881,14 @@ def identifyArgs(func_t):
                     if type == 7 or type == 6:#call or jmp, include near or far address
                         if GetMnem(addr)=="call":
                             functionName = GetOpnd(addr,i)
-                            print "functionName:",functionName
                             if function.functionMap.has_key(functionName):
-                                print "function call",functionName
-                                print "functionName:",functionSet
                                 if functionName not in functionSet:
-                                    print "旧的参数集合，寄存器参数，修改的寄存器",registerArgs,modifiedReg
                                     storeCurrentArgs(name,stackArgs,registerArgs,modifiedReg)
                                     calleeStackArgs, calleeRegisterArgs,calleeModifiedReg = identifyArgs(function.functionMap[functionName])
-                                    print "旧的参数集合，寄存器参数，修改的寄存器",registerArgs,modifiedReg
-                                    print "被调的参数集合，被调的栈参数，被调的寄存器参数，被调的修改参数", calleeStackArgs, calleeRegisterArgs,calleeModifiedReg
                                     #modifiedReg = modifiedReg | calleeModifiedReg
                                     tempRegisterArgs = calleeRegisterArgs - modifiedReg
                                     registerArgs = registerArgs | tempRegisterArgs
                                     modifiedReg = modifiedReg | calleeModifiedReg
-                                    print "新的参数集合，寄存器参数，修改的寄存器",registerArgs,modifiedReg
                                     if functionName in functionSet:#计算完这个函数的参数了，需要退出
                                         functionSet.remove(functionName)
                                 else:#之前出现过，现在又有可能再次出现的函数
@@ -966,24 +897,17 @@ def identifyArgs(func_t):
                                         calleeStackArgs = set(argsList1[0])
                                         calleeRegisterArgs = set(argsList1[1])
                                         calleeModifiedReg = set(argsList1[2])
-                                        print "旧的参数集合，寄存器参数，修改的寄存器",registerArgs,modifiedReg
-                                        print "被调的参数集合，被调的栈参数，被调的寄存器参数，被调的修改参数", calleeStackArgs, calleeRegisterArgs,calleeModifiedReg
                                         #modifiedReg = modifiedReg | calleeModifiedReg
                                         tempRegisterArgs = calleeRegisterArgs - modifiedReg
                                         registerArgs = registerArgs | tempRegisterArgs
                                         modifiedReg = modifiedReg | calleeModifiedReg
-                                        print "新的参数集合，寄存器参数，修改的寄存器",registerArgs,modifiedReg
                                     else:#"之前出现过，但是还没有计算完参数,获取已知的参数"
                                         calleeRegisterArgs,calleeModifiedReg = getCurrentArgs(functionName)
                                         tempRegisterArgs = calleeRegisterArgs - modifiedReg
                                         registerArgs = registerArgs | tempRegisterArgs
                                         modifiedReg = modifiedReg | calleeModifiedReg
-                                        print "之前出现过，但是还没有计算完参数"
-                                        print "新的参数集合，寄存器参数，修改的寄存器",registerArgs,modifiedReg
                                     #print "旧的参数集合，寄存器参数，修改的寄存器",registerArgs,modifiedReg
                             elif isLibFunc_EAX_return(functionName[1:]):#库函数
-                                print "库函数调用",functionName
-                                print "加入寄存器参数集合 eax"
                                 modifiedReg.add("eax")
                 length = length + 1
             stackArgs_all = stackArgs_all | stackArgs
@@ -996,7 +920,6 @@ def identifyArgs(func_t):
         argsList_all.append(list(modifiedReg_all))
         function.args[name] = argsList_all
     else:
-        print "visited: true"
         argsList_all = function.args[name]
         stackArgs_all = set(argsList_all[0])
         registerArgs_all = set(argsList_all[1])
@@ -1021,13 +944,11 @@ def getCurrentArgs(name):
 def decompile_func(ea):
     f = get_func(ea)
     if f is None:
-        print "error in get_func"
         return False
     try:
         cfunc = decompile(f);
     except BaseException,e:
         print "decompile failure"
-        print str(e)
         return False
     else:
         if cfunc is None:
@@ -1048,7 +969,6 @@ def getRegisterParametersFromFunctionPseudocode(funcStartAddr):
         print "Failure during decompiling"
         return []
     else:
-        print "line:",declarationLine
         index1 = declarationLine.find('(')
         if index1 != -1 :
             declarationLine = declarationLine[index1 + 1:-1]
@@ -1065,7 +985,6 @@ def getFunctionsArgs():
 
 def storeNewCfg(db,cfgInfo):
     documents = []
-    print "newcfg",cfgInfo
     for item in cfgInfo.keys():
         document = {}
         document["startAddr"] = item
@@ -1083,7 +1002,6 @@ def storeNewCfg(db,cfgInfo):
 def processFunction(func_t,db):
     global functionSet
     functionSet.clear()
-    print "-------------------",GetFunctionName(func_t.startEA),"-----------------------"
     startAddr = func_t.startEA
     frameSize = GetFrameSize(func_t.startEA)
     allBlocks = getAllBlocksInFunction(func_t)#allBlocks is a dictionary
@@ -1106,20 +1024,11 @@ def processFunction(func_t,db):
         document1["hexInstrs"]=repBinary
         document1["end"] = 0#暂时不需要
         document1List.append(document1)
-    print "reps",reps
     database.insertManyForBlock(db,document1List)
-    print "<-----开始伪代码表示的函数参数----->"
-    print "function:",GetFunctionName(func_t.startEA)
     registerParameterList = getRegisterParametersFromFunctionPseudocode(func_t.startEA)
-    print registerParameterList
-    print "<-----结束伪代码表示的函数参数----->"
-    print "###############开始识别函数参数:",GetFunctionName(func_t.startEA)
     registerArgs = getNewArgsRegisterList(registerParameterList)
     functionSet.clear()
     stackArgs_stack,registerArgs_stack,modifiedReg_stack = identifyStackArgs(func_t)
-    print "寄存器参数:",registerArgs
-    print "栈参数:",stackArgs_stack
-    print "###############结束识别函数参数:",GetFunctionName(func_t.startEA)
     funDocument = {}
     funDocument["start"] = startAddr
     funDocument["end"] = func_t.endEA
@@ -1130,8 +1039,6 @@ def processFunction(func_t,db):
         funDocument["ebpBased"] = 1
     else:
         funDocument["ebpBased"] = 0
-    print "stackArgs:",len(stackArgs_stack),stackArgs_stack
-    print "registerArgs:",len(registerArgs),registerArgs
     global isVulnerabilityProgram
     if isVulnerabilityProgram:
         funDocument["vulnerability"] = 0
@@ -1150,12 +1057,7 @@ def storeFunction(db,functionsDict):
 #这个方法没有效果https://reverseengineering.stackexchange.com/questions/8870/extracting-arguments-from-ida
 def getArgs(addr,name):
     tif = tinfo_t()
-    print set_tinfo2(here(),tif)
-    print get_tinfo2(here(),tif)
     funcdata =  func_type_data_t()
-    print tif.get_func_details(funcdata)
-    print funcdata.size()
-    print "for function:",name
     for i in xrange(funcdata.size()):
         print "Arg %d: %s (of type %s, and of location: %s)" % (i, funcdata[i].name, print_tinfo('', 0, 0, PRTYPE_1LINE, funcdata[i].type, '', ''), funcdata[i].argloc.atype())
 
@@ -1193,9 +1095,6 @@ def getFunctions(db):
             functionEBPBased[funName] = True
         else:
             functionEBPBased[funName] = False
-    print "functionEBPBased:"
-    print functionEBPBased
-    print "libFunctions: ", function.lib_function
     storeFunction(db,function.lib_function)
     global f
     f.flush()
@@ -1230,9 +1129,6 @@ def getFunctions_new(db):
         else:
             functionEBPBased[funName] = False
         getArgs(fun.startEA, funName)
-    print "functionEBPBased:"
-    print functionEBPBased
-    print "libFunctions: ", function.lib_function
     storeFunction(db,function.lib_function)
     global f
     f.flush()
@@ -1243,27 +1139,21 @@ def findJumpTable():
 
 def changeEncoding(value):
     encoding =  chardet.detect(value)
-    print encoding
     type = encoding["encoding"]
-    print type
     if type == "ISO-8859-1":
         value = value.decode("ISO-8859-1").encode("utf-8")
-        print "convert encoding if"
         return value
     elif (type is None) or (type == "ISO-8859-8"):
         value = " "
-        print "convert encoding elif",type
         return value
     else:
         value = value.decode(type).encode("utf-8")
-        print "convert encoding else"
         return value
 
 def storePushAndCall(db):
     
     global pushAndCallList
     tempList = list(pushAndCallList)
-    print "pushAndCall",tempList
     document = {}
     document["addrs"] = tempList
     try:
@@ -1277,23 +1167,18 @@ def storePushAndCall(db):
 def storeConst(db):
     documents = []
     for key in segment.constUsage.keys():
-        print "key",key
         document = {}
         value = segment.constUsage[key]
         #if value == '\xc8':
             #value = ''
         document["addr"] = key
         document["value"] = value
-        print document
         try:
             database.insertOneForConst(db,document)
         except BaseException:
             global f
             f.close()
         documents.append(document)
-    print documents
-    print "constUsage:"
-    print segment.constUsage
 
 def initSegment(db):
     result = Segments()#return the start address of each segment
@@ -1301,9 +1186,6 @@ def initSegment(db):
     for startAddr in result:
         document = {}
         name = get_segm_name(startAddr)
-        print "----start segment----"
-        print name
-        print "----end segment----"
         document["name"] = name[1:]
         document["start"] = startAddr
         document["end"] = SegEnd(startAddr)
@@ -1357,7 +1239,6 @@ def getAllPath(funcInstance):
         for item in path:
             path_addr.append(reverse_Id_Addr[item])
         allPaths_addr.append(path_addr)
-    print "allPaths_addr:",allPaths_addr
     allInstr = []
     for path in allPaths_addr:
         instr = []
@@ -1365,7 +1246,6 @@ def getAllPath(funcInstance):
             value = getAllInstrAddrInOneBlock(funcInstance._func,item,funcInstance._block_boundary[item])
             instr.extend(value)
         allInstr.append(instr)
-    print "allInstr:",allInstr
     funcInstance.allPaths = allInstr
     allFuncInstancesPath[funcInstance._addr_func] = funcInstance
 
@@ -1420,9 +1300,6 @@ def initialSameRandomValue(db):
     database.insertOneForSameRandomValue(db,document)
 
 def parseArgs():
-    print "idbPath:",GetIdbPath()
-    print "inputFilePath:",GetInputFilePath()
-    print "inputFile:",GetInputFile()
     global fileName,programName
     fileName = GetInputFile()
     programName = GetInputFilePath().split('\\')[-2]#项目名指openssl名字带有具体的版本号，文件名指项目下的具体文件的名字，如果是静态链接程序那么就可能是项目的名字，如果是动态链接文件，那么就是具体的库文件的名字
@@ -1435,11 +1312,7 @@ def parseArgs():
             if tempList[1] in ["V","v"]:
                 global isVulnerabilityProgram
                 isVulnerabilityProgram=True
-                print "预处理的程序为漏洞程序"
-            else:
-                print "预处理的程序为目标程序"
         else:
-            print "参数解析错误,参数使用为--type=T or --type=V"
             exit()
             
 def main():
@@ -1496,27 +1369,18 @@ def stdout_to_file(output_file_name, output_dir=None):
     Returns: output file descriptor, original stdout descriptor
     '''
     global f
-    # obtain this script path and build output path
     if not output_dir:
         output_dir = os.path.dirname(os.path.realpath(__file__))
 
     output_file_path = os.path.join(output_dir, output_file_name)
-
-    print "original output start"
-    # save original stdout descriptor
     orig_stdout = sys.stdout
-
-    # create output file
     f = file(output_file_path, "w")
-
-    # set stdout to output file descriptor
     sys.stdout = f
 
     return f, orig_stdout
 
 if __name__ == '__main__':
     global f
-    # get original stdout and output file descriptor
     f, orig_stdout = stdout_to_file("output.txt")
     main()
     sys.stdout = orig_stdout #recover the output to the console window
